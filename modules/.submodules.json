@@ -20,7 +20,9 @@
     "fabrickIdSystem",
     "verizonMediaIdSystem",
     "pubProvidedIdSystem",
-    "tapadIdSystem"
+    "tapadIdSystem",
+    "akamaiDapIdSystem",
+    "akamaiDataActivationPlatform"
   ],
   "adpod": [
     "freeWheelAdserverVideo",
