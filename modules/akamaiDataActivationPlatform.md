@@ -22,7 +22,7 @@ pbjs.setConfig({
     userIds: [{
       name: 'akamaiDataActivationPlatform',
       params: {
-        type: signature | email | mobile | ...
+        type: dap-signature | email | mobile | ...
       },
       storage: {
         type: 'html5',           // "html5" is the required storage type

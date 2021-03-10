@@ -172,7 +172,13 @@ const USER_IDS_CONFIG = {
   'tapadId': {
     source: 'tapad.com',
     atype: 1
-  }
+  },
+
+  // Akamai Data Activation Platform (DAP)
+  'dapToken': {
+    source: 'dap.akamai.com',
+    atype: 1
+  },
 };
 
 // this function will create an eid object for the given UserId sub-module

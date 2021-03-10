@@ -12,9 +12,34 @@ import { getStorageManager } from '../src/storageManager.js';
 import { uspDataHandler } from '../src/adapterManager.js';
 
 const MODULE_NAME = 'akamaiDataActivationPlatform';
-const DAP_STORAGE_KEY_NAME = 'akamai_dap_token';
+const STORAGE_KEY = 'akamai_dap_token';
 
 export const storage = getStorageManager();
+
+function logMessage() {
+  console.log.apply(console, decorateLog(arguments, 'MESSAGE:'));
+}
+
+function logInfo() {
+  console.info.apply(console, decorateLog(arguments, 'INFO:'));
+}
+
+function logWarn() {
+  console.warn.apply(console, decorateLog(arguments, 'WARNING:'));
+}
+
+function logError() {
+  console.error.apply(console, decorateLog(arguments, 'ERROR:'));
+  events.emit(CONSTANTS.EVENTS.AUCTION_DEBUG, {type: 'ERROR', arguments: arguments});
+}
+
+function decorateLog(args, prefix) {
+  args = [].slice.call(args);
+  prefix && args.unshift(prefix);
+  args.unshift('display: inline-block; color: #fff; background: #eb8f34; padding: 1px 4px; border-radius: 3px;');
+  args.unshift('%cAkamai');
+  return args;
+}
 
 /** @type {Submodule} */
 export const akamaiDataActivationPlatformSubmodule = {
@@ -30,8 +55,12 @@ export const akamaiDataActivationPlatformSubmodule = {
    * @returns {{dapToken:string}}
    */
   decode(value) {
-    const id = (value && value.ppid && typeof value.ppid.id === 'string') ? value.ppid.id : undefined;
-    return id ? { 'dapToken': id } : undefined;
+    //const id = (value && value.ppid && typeof value.ppid.id === 'string') ? value.ppid.id : undefined;
+    //logMessage("DEBUG(decode): value=" + value + ", id=" + id);
+    //return id ? { 'dapToken': id } : undefined;
+    //let o = { id: value };
+    logMessage("[decode] value=", value );
+    return { dapToken: value };
   },
   
   /**
@@ -44,90 +73,83 @@ export const akamaiDataActivationPlatformSubmodule = {
   getId(config, consentData) {
     const configParams = (config && config.params) || {};
     if (!configParams) {
-      utils.logError('User ID - akamaiDapToken submodule requires a valid configParams');
+      logError('User ID - akamaiDapToken submodule requires a valid configParams');
       return;
     } else if (typeof configParams.apiHostname !== 'string') {
-      utils.logError('User ID - akamaiDapToken submodule requires a valid configParams.apiHostname');
+      logError('User ID - akamaiDapToken submodule requires a valid configParams.apiHostname');
       return;
     } else if (typeof configParams.domain !== 'string') {
-      utils.logError('User ID - akamaiDapToken submodule requires a valid configParams.domain');
+      logError('User ID - akamaiDapToken submodule requires a valid configParams.domain');
       return;
     } else if (typeof configParams.type !== 'string') {
-      utils.logError('User ID - akamaiDapToken submodule requires a valid configParams.type');
+      logError('User ID - akamaiDapToken submodule requires a valid configParams.type');
       return;
     }
     const hasGdpr = (consentData && typeof consentData.gdprApplies === 'boolean' && consentData.gdprApplies) ? 1 : 0;
     const gdprConsentString = hasGdpr ? consentData.consentString : '';
     const uspConsent = uspDataHandler.getConsentData();
     if (hasGdpr && (!gdprConsentString || gdprConsentString === '')) {
-      utils.logError('User ID - akamaiDapToken submobile requires consent string to call API');
+      logError('User ID - akamaiDapToken submobile requires consent string to call API');
       return;
     }
     // XXX: retrieve first-party data here if needed
     let url = '';
     let postData = undefined;
-    if (configParams.type.startsWith("signature:")) {
+    let tokenName = '';
+    if (configParams.type.startsWith("dap-signature:")) {
       let parts = configParams.type.split(":");
       let v = parts[1];
       url = `https://${configParams.apiHostname}/data-activation/v1/domain/${configParams.domain}/signature?v=${v}&gdpr=${hasGdpr}&gdpr_consent=${gdprConsentString}&us_privacy=${uspConsent}`;
+      tokenName = 'SigToken';
     } else {
       url = `https://${configParams.apiHostname}/data-activation/v1/identity/tokenize?gdpr=${hasGdpr}&gdpr_consent=${gdprConsentString}&us_privacy=${uspConsent}`;
       postData = {
         "version": 1,
-        "account": "B-3-1G3ZFUQ",
         "domain": configParams.domain,
         "identity": configParams.identity,
         "type": configParams.type
       };
+      tokenName = 'PubToken';
     }
 
-    console.log( "DAP: url="+url+", postData=", postData );
+    logInfo("[getId] making API call for " + tokenName);
 
+    /*
     const resp = function (callback) {
       const callbacks = {
         success: response => {
           // TODO: validate that the response object is a well-formed JWT/JWE.
-          let responseObj;
-          if (response) {
-            try {
-              responseObj = response;
-            } catch (error) {
-              utils.logError(error);
-            }
-          }
-          // XXX: set first-party data here if needed
-          callback(responseObj);
+          let o = { id: response };
+          logInfo("[getId:ajax.success]", o);
+          callback(o);
         },
         error: error => {
-          utils.logError(`${MODULE_NAME}: dapToken fetch encountered an error`, error);
+          logError("[getId:ajax.error] Failed to retrieve " + tokenName, error);
           callback();
         }
       };
       //ajax(url, callbacks, postData, {withCredentials: true});
       ajax(url, callbacks, JSON.stringify(postData), {contentType: "application/json"});
     };
+    */
 
-    return {callback: resp};
+    let cb = {
+      success: response => {
+        storage.setDataInLocalStorage( STORAGE_KEY, response );
+      },
+      error: error => {
+        logError("[getId:ajax.error] failed to retrieve " + tokenName, error);
+      }
+    };
+
+    ajax( url, cb, JSON.stringify( postData ), { contentType: "application/json" } );
+
+    let token = storage.getDataFromLocalStorage( STORAGE_KEY );
+    logMessage( "[getId] returning", token );
+
+    return { id: token };
   }
 };
-
-function getFirstPartyId() {
-  let fpId = storage.localStorageIsEnabled ? storage.getDataFromLocalStorage(DAP_STORAGE_KEY_NAME) : null;
-  if (!fpId) {
-    fpId = storage.cookiesAreEnabled ? storage.getCookie(DAP_STORAGE_KEY_NAME) : null;
-  }
-  return fpId || '';
-}
-
-function setFirstPartyId(fpId) {
-  if (fpId) {
-    if (storage.localStorageIsEnabled) {
-      storage.setDataInLocalStorage(DAP_STORAGE_KEY_NAME, fpId);
-    } else if (storage.cookiesAreEnabled) {
-      storage.setCookie(DAP_STORAGE_KEY_NAME, fpId);
-    }
-  }
-}
 
 submodule('userId', akamaiDataActivationPlatformSubmodule);
 /* vim: set ts=2 sw=2 et: */
