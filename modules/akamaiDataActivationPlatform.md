@@ -1,10 +1,14 @@
 # Akamai Data Activation Platform Audience Segment ID Targeting
 
-Akamai Data Activation Platform (DAP) is a system that allows Advertisers to reach intended audiences, and protects end-user privacy on Publisher sites by grouping individuals into large audience segments.  The Prebid UserID module integration utilizies an ephemeral token for the ID as opposed to a persistent, deterministic ID to help ensure privacy.  The ephemeral token is then used to lookup audience segment membership throughout the end-user's engagement with the web property.
+The Akamai Data Activation Platform (DAP) is a privacy-first system that protects end-user privacy by only allowing them to be targeted as part of a larger cohort.  DAP views hiding invididuals in large crows as the best mechanism to prevent unauthorized tracking.
+
+The integration of DAP into Prebid.JS consists of creating a UserID plugin that interacts with the DAP API.  The UserID module tokenizes the end-user identity into an ephemeral, secure pseudonymization called a DAP token.  The DAP Token is then supplied to the bid-stream where the SSP partner looks up cohort membership for that token, and supplies the cohorts to the rest of the bid-stream.
+
+In this system, no end-user identifier is supplied to the bid-stream, only cohorts.  This is a foundational privacy principle DAP is built upon.
 
 ## Onboarding
 
-Please reach out to your Akamai sales representative to get provided on the DAP platform.
+Please reach out to your Akamai account representative to get provisioned on the DAP platform.
 
 ## DAP Configuration
 
@@ -22,15 +26,10 @@ pbjs.setConfig({
     userIds: [{
       name: 'akamaiDataActivationPlatform',
       params: {
-        type: dap-signature | email | mobile | ...
+        apiHostname: '<see your Akamai account rep>',
+        domain: 'your-domain.com',
+        type: 'email' | 'mobile' | ... | 'dap-signature:1.0.0'
       },
-      storage: {
-        type: 'html5',           // "html5" is the required storage type
-        name: 'akamaiDapId',     // "akamaiDapid" is the required storage name
-        expires: 90,             // storage lasts for 90 days
-        refreshInSeconds: 30     // refresh ID every 30 seconds to ensure ephemeralness
-                                 // TODO: can refresh be triggered by a page load?
-      }
     }],
     auctionDelay: 50             // 50ms maximum auction delay, applies to all userId modules
   }
@@ -39,4 +38,4 @@ pbjs.setConfig({
 
 ## TODO
 
-Complete this documentation.
+This documentation is a work in progress...
